@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+</head>
+<body>
+    <input type="text" name="zip_field" id="zip"><br>
+    <input type="button" name="submit" id="submit" value="Submit" onclick="callServer()">
+    <div id="zipData"></div>
+    <script>
+        function callServer() {
+            console.log("called the function")
+            var element = document.getElementById("zip").value;
+            fetch("http://localhost:8000/zips/city/" + element)
+                .then(function(resp) {
+                    return resp.json()
+                })
+                .then(function(data) {
+                    var jsonString = JSON.stringify(data);
+                    document.body.innerHTML = jsonString;
+                })
+                .catch(function(err) {
+                    console.error(err)
+                });
+        }
+    </script>
+</body>
+</html>

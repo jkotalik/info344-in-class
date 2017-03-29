@@ -15,11 +15,23 @@ package main
 //of its exported types and functions as properties and
 //methods of that object. See below for examples.
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"path"
+	"strings"
 )
+
+type zip struct {
+	Zip   string `json:"zip"`
+	City  string `json:"city"`
+	State string `json:"state"`
+}
+
+type zipSlice []*zip
+type zipIndex map[string]zipSlice
 
 //helloHandler handles requests made to the /hello path.
 //Every HTTP handler has this same signature:
@@ -56,6 +68,20 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Hello " + name))
 }
 
+// ResponseWriter is an interface, just has a few methods that allows us to
+// write to the response. Interfaces are always pass by reference!
+func (zi zipIndex) zipsForCityHandler(w http.ResponseWriter, r *http.Request) {
+	// What was the city they requested, and what is the reponses
+	_, city := path.Split(r.URL.Path)
+	lcity := strings.ToLower(city)
+	w.Header().Add("Content-Type", "application/json; charset=utf-8;")
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	encoder := json.NewEncoder(w)
+	if err := encoder.Encode(zi[lcity]); err != nil {
+		http.Error(w, "error encoding json: "+err.Error(), http.StatusInternalServerError)
+	}
+}
+
 //main is the entry-point for all go programs
 //program execution starts with this function
 func main() {
@@ -73,12 +99,36 @@ func main() {
 		log.Fatal("please set ADDR environment variable")
 	}
 
+	// TODO how do I specify path as shown in class here?
+	// may be path variable issue
+	f, err := os.Open("../src/info344/info344-in-class/data/zips.json")
+
+	if err != nil {
+		log.Fatal("Error opening zips file: " + err.Error())
+	}
+
+	zips := make(zipSlice, 0, 43000)
+	decoder := json.NewDecoder(f)
+
+	if err := decoder.Decode(&zips); err != nil {
+		log.Fatal("Error decoding zips json: " + err.Error())
+	}
+	fmt.Printf("Loaded %d zips\n", len(zips))
+
+	zi := make(zipIndex)
+
+	for _, z := range zips {
+		lower := strings.ToLower(z.City)
+		zi[lower] = append(zi[lower], z)
+	}
+
+	fmt.Printf("There are %d zips in Seattle\n", len(zi["seattle"]))
 	//Register our helloHandler as the handler for
 	//the `/hello` resource path. Whenever a request
 	//is made to this path, the Go web server will
 	//call our helloHandler function.
 	http.HandleFunc("/hello", helloHandler)
-
+	http.HandleFunc("/zips/city/", zi.zipsForCityHandler)
 	//Let the client know what address the server is
 	//listening on. The `fmt` package lets you write
 	//messages to stdout. It can also format messages
